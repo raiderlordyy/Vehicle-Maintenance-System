@@ -1,8 +1,47 @@
-from database.db import fetch_all as query, execute_query as run
+from database.db import get_connection, fetch_all as query, execute_query as run
 from models import Vehicle,Service
+from password_utils import hash_password, is_password_hash, verify_password
+
+
 class Auth:
     @staticmethod
-    def login(u,p): return query('SELECT id,username,full_name,role FROM users WHERE username=%s AND password=%s',(u,p))
+    def login(username, password):
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute("SELECT id, username, full_name, role, password FROM users")
+            users = cur.fetchall()
+
+            for user in users:
+                stored_password = user["password"]
+                if not is_password_hash(stored_password):
+                    hashed_password = hash_password(stored_password)
+                    cur.execute(
+                        "UPDATE users SET password=%s WHERE id=%s AND password=%s",
+                        (hashed_password, user["id"], stored_password),
+                    )
+                    user["password"] = hashed_password
+
+            conn.commit()
+
+            user = next((row for row in users if row["username"] == username), None)
+            if user is None or not verify_password(password, user["password"]):
+                return None
+
+            return {
+                "id": user["id"],
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "role": user["role"],
+            }
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cur.close()
+            conn.close()
+
+
 class Vehicles:
     @staticmethod
     def all(): return query('SELECT * FROM vehicles ORDER BY id DESC')

@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 
 import mysql.connector
 
-from database.db import get_connection
+from services import Auth
 from app.ui_helpers import (
     configure_style,
     nav_button,
@@ -256,16 +256,7 @@ def launch_login():
             return
 
         try:
-            conn = get_connection()
-            cur = conn.cursor(dictionary=True)
-            cur.execute("""
-                SELECT id, username, full_name, role
-                FROM users
-                WHERE username=%s AND password=%s
-            """, (u, p))
-            user = cur.fetchone()
-            cur.close()
-            conn.close()
+            user = Auth.login(u, p)
 
             if user:
                 login.destroy()
